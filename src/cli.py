@@ -4,7 +4,9 @@ import os
 import sys
 import shutil
 from pathlib import Path
-import re # For sanitizing filenames
+import uuid
+import re
+from tqdm import tqdm
 
 # --- Dependency Import and Checks ---
 try:
@@ -34,6 +36,72 @@ except ImportError:
     pass # Optional, checked later
 
 # --- Helper Functions ---
+def download_audio_from_url(url: str, output_dir: Path) -> Path | None:
+    """Downloads audio from a URL using yt-dlp, extracts to WAV, and saves to output_dir."""
+    print(f"Attempting to download audio from URL: {url}")
+
+    # First, extract info to get a title for our filename, and sanitize it
+    try:
+        # Use a temporary ydl instance just to get info without full logging if not needed
+        info_ydl_opts = {'quiet': True, 'noplaylist': True, 'extract_flat': 'discard_in_extractor'}
+        with yt_dlp.YoutubeDL(info_ydl_opts) as ydl_info:
+            info = ydl_info.extract_info(url, download=False)
+            # Use a UUID if title is missing or too generic to avoid collisions
+            video_title = info.get('title', f"untitled_video_{uuid.uuid4().hex[:8]}")
+            sanitized_title_stem = sanitize_filename(video_title)
+    except Exception as e:
+        print(f"Could not extract video info for naming: {e}. Using a generic name.")
+        sanitized_title_stem = f"downloaded_audio_{uuid.uuid4().hex[:8]}"
+
+    # Define the exact output path stem (yt-dlp's audio extractor will add .wav)
+    # This is where the final .wav file should appear.
+    output_filename_stem = output_dir / sanitized_title_stem
+    expected_wav_path = output_filename_stem.with_suffix(".wav")
+
+    ydl_opts_download = {
+        'format': 'bestaudio/best',
+        'outtmpl': str(output_filename_stem),  # Output stem, postprocessor adds extension
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'wav',
+            'preferredquality': '192', # Not directly for WAV, but good practice if intermediate is used
+        }],
+        'noplaylist': True,
+        'quiet': False, # Show yt-dlp's own progress
+        'progress': True,
+        'keepvideo': False, # Delete intermediate downloaded file (e.g. webm, mp4)
+        'ignoreerrors': False,
+    }
+
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts_download) as ydl:
+            print(f"yt-dlp: Downloading and extracting audio. Expected output: {expected_wav_path}")
+            error_code = ydl.download([url])
+            if error_code != 0:
+                print(f"Error: yt-dlp download process returned error code {error_code}.")
+                return None
+
+        if expected_wav_path.exists() and expected_wav_path.is_file():
+            print(f"Audio successfully downloaded and extracted to: {expected_wav_path}")
+            return expected_wav_path
+        else:
+            # Fallback if the exact filename isn't found (e.g. due to yt-dlp subtle sanitization differences)
+            print(f"Warning: Expected file {expected_wav_path} not found. Searching in output directory...")
+            for item in output_dir.iterdir():
+                if item.stem == sanitized_title_stem and item.suffix.lower() == '.wav' and item.is_file():
+                    print(f"Found matching WAV file: {item}")
+                    return item
+            print(f"Error: Could not reliably locate the downloaded WAV file in '{output_dir}'. Please check yt-dlp's output above.")
+            return None
+
+    except yt_dlp.utils.DownloadError as de:
+        print(f"yt-dlp DownloadError: {de}")
+        return None
+    except Exception as e:
+        print(f"An unexpected error occurred during download: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
 
 def sanitize_filename(name: str) -> str:
     """Sanitizes a string to be a valid filename component."""
@@ -389,15 +457,15 @@ def main():
     current_audio_file: Path | None = None
     files_to_cleanup = []
 
-    # --- Step 0: Input Handling ---
-    if is_url(args.input_source):
-        download_output_dir = output_dir / "downloaded_audio_files"
-        download_output_dir.mkdir(parents=True, exist_ok=True)
-        current_audio_file = download_audio_from_url(args.input_source, download_output_dir)
-        if current_audio_file and not args.keep_intermediate_files:
-            temp_files_to_cleanup.append(current_audio_file)
-    else:
-        # ... (local file handling logic remains the same) ...
+    # Determine number of main stages for tqdm
+    num_stages = 1 # Download/Input
+    if args.separator_model_name: num_stages += 1 # Separation
+    if args.enable_enhancement: num_stages += 1 # Enhancement
+    if args.output_sample_rate or args.output_mono: num_stages +=1 # Finalization (if distinct from last step)
+    else: num_stages +=1 # For final copy/naming if no other processing
+
+    with tqdm(total=num_stages, desc="Overall Progress", unit="stage", dynamic_ncols=True) as pbar:
+        # --- Step 0: Input Handling ---
         local_file_path = Path(args.input_source)
         if not local_file_path.exists():
             print(f"Error: Local file not found: {local_file_path}")
