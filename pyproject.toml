@@ -34,9 +34,7 @@ dependencies = [
 ]
 
 [project.scripts]
-# This expects 'cli.py' to be at the top level of the installed package
-# and 'sepaudio_lib' to be importable as a package.
-sepaudio = "cli:main"
+sepaudio = "cli:main" # Expects cli.py at top level
 
 [project.urls]
 homepage = "https://github.com/fblissjr/sepaudio"
@@ -44,28 +42,24 @@ repository = "https://github.com/fblissjr/sepaudio"
 
 # --- Hatch Configuration ---
 [tool.hatch.build.targets.wheel]
-# 'packages' should list directories (relative to project root or 'src')
-# that are Python packages.
-# Hatch will find 'src/sepaudio_lib' and package it as 'sepaudio_lib'.
+# This tells Hatch to find a package directory named 'sepaudio_lib' inside 'src/'
+# and package it as 'sepaudio_lib'.
 packages = ["src/sepaudio_lib"]
 
-# To include 'src/cli.py' as a top-level module 'cli.py' in the wheel:
+# This explicitly copies src/cli.py to the root of the wheel as cli.py,
+# making `import cli` and the script entry `cli:main` work.
 [tool.hatch.build.targets.wheel.force-include]
 "src/cli.py" = "cli.py"
 
 
-# --- Ruff Configuration (remains the same) ---
+# --- Ruff Configuration ---
 [tool.ruff]
 line-length = 110
 target-version = "py311"
-exclude = [
-    ".venv", "__pypackages__", "build", "dist", ".ruff_cache",
-]
+exclude = [ ".venv", "__pypackages__", "build", "dist", ".ruff_cache" ]
 [tool.ruff.lint]
-select = [
-    "E", "W", "F", "I", "UP", "B", "T20", "RUF",
-]
-ignore = []
+select = [ "E", "W", "F", "I", "UP", "B", "T20", "RUF", "ANN" ]
+ignore = ["ANN101", "ANN102", "ANN401"]
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
