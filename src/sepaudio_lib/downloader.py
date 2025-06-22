@@ -1,12 +1,12 @@
 import uuid
 from pathlib import Path
 import yt_dlp
-from .utils import sanitize_filename # Import from within the same package
+from .utils import sanitize_filename
 
 try:
     from moviepy.editor import AudioFileClip
 except ImportError:
-    AudioFileClip = None # Handle missing optional dependency
+    AudioFileClip = None
 
 def download_audio_from_url(url: str, output_dir: Path) -> Path | None:
     """Downloads audio from a URL using yt-dlp, extracts to WAV, and saves to output_dir."""
@@ -41,7 +41,7 @@ def download_audio_from_url(url: str, output_dir: Path) -> Path | None:
             print(f"Audio successfully downloaded and extracted to: {expected_wav_path}")
             return expected_wav_path
         else:
-            print(f"Warning: Expected file {expected_wav_path} not found. Searching in output directory...")
+            print(f"Warning: Expected file {expected_wav_path} not found. Searching in '{output_dir}' for stem '{sanitized_title_stem}.wav'...")
             for item in output_dir.iterdir():
                 if item.stem == sanitized_title_stem and item.suffix.lower() == '.wav' and item.is_file():
                     print(f"Found matching WAV file: {item}")
@@ -65,6 +65,8 @@ def extract_audio_from_local_video(video_path: Path, output_dir: Path) -> Path |
         return None
     print(f"Extracting audio from local video: {video_path.name}")
     try:
+        # Ensure the output directory for extracted audio exists
+        output_dir.mkdir(parents=True, exist_ok=True)
         output_filename = output_dir / f"{video_path.stem}_extracted.wav"
         video_clip = AudioFileClip(str(video_path))
         video_clip.write_audiofile(str(output_filename))
