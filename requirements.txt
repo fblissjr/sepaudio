@@ -1,4 +1,5 @@
-audio-separator[gpu]
+audio-separator
+#audio-separator[gpu]
 torch
 torchaudio
 yt-dlp
