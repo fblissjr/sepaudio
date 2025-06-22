@@ -39,7 +39,8 @@ def main():
     )
     parser.add_argument(
         "--enhancer_model_name",
-        default="speechbrain/sepformer-dns4-16k-enhancement",
+        # default="speechbrain/sepformer-dns4-16k-enhancement",
+        default="htdemucs_ft.yaml"
         help="Model name for Stage 2 speech enhancement (from SpeechBrain/Hugging Face)."
     )
     parser.add_argument(
