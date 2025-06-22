@@ -1,0 +1,7 @@
+audio-separator[gpu]
+torch
+torchaudio
+yt-dlp
+moviepy
+speechbrain
+numpy
