@@ -1,12 +1,14 @@
+# src/sepaudio_lib/processor.py
 import shutil
 import uuid
 from pathlib import Path
-import torch # Keep torch import for type hints if used, or for general utility
+import torch
+import logging
 
 try:
     from audio_separator.separator import Separator
 except ImportError:
-    Separator = None # Handle missing optional dependency
+    Separator = None
 
 try:
     from speechbrain.inference.enhancement import SepformerEnhancement
@@ -14,6 +16,26 @@ try:
     from torchaudio.transforms import Resample
 except ImportError:
     SepformerEnhancement = None # Handle missing optional dependency
+    torchaudio = None
+    Resample = None
+
+import shutil
+import uuid
+from pathlib import Path
+import torch 
+import logging # Make sure logging is imported at the top of this file
+
+try:
+    from audio_separator.separator import Separator
+except ImportError:
+    Separator = None 
+
+try:
+    from speechbrain.inference.enhancement import SepformerEnhancement
+    import torchaudio
+    from torchaudio.transforms import Resample
+except ImportError:
+    SepformerEnhancement = None 
     torchaudio = None
     Resample = None
 
@@ -32,22 +54,11 @@ def run_stage1_separation(input_audio_path: Path, output_dir: Path, model_name: 
     temp_separation_subdir.mkdir(parents=True, exist_ok=True)
 
     try:
-        # This is the part that was causing the error.
-        # Let's try the MOST basic initialization and then configuration.
-        # separator = Separator() # Try initializing with no arguments
-        # separator.output_dir = str(temp_separation_subdir)
-        # separator.log_level = 'INFO'
-        # separator.load_model(model_name=model_name)
-
-        # Alternative based on some library patterns if the above still fails:
-        # Directly from the library's own CLI example structure if it's different
-        # For now, assuming the common API pattern:
         separator = Separator(
-             output_dir=str(temp_separation_subdir), # Usually okay
-             log_level='INFO'
+             output_dir=str(temp_separation_subdir),
+             log_level=logging.INFO  # Use the integer constant logging.INFO
         )
-        separator.load_model(model_name) # Pass model_name here
-
+        separator.load_model(model_name) # Load the model after basic initialization
 
         print(f"Model '{model_name}' loaded for separation.")
         print(f"Starting separation process for {input_audio_path}...")
@@ -84,10 +95,9 @@ def run_stage1_separation(input_audio_path: Path, output_dir: Path, model_name: 
             print("Error: Vocal stem not found or separation failed.")
             if temp_separation_subdir.exists(): shutil.rmtree(temp_separation_subdir)
             return None
-    except TypeError as te: # Catch the specific TypeError again
+    except TypeError as te: 
         print(f"TypeError during Separator initialization or usage: {te}")
-        print("This often means the way Separator() or its methods are called doesn't match the installed library version.")
-        print("Please check the audio-separator library's documentation for correct API usage.")
+        print("This often means the way Separator() or its methods are called doesn't match the installed library version, or log_level was a string instead of logging.INFO, etc.")
         import traceback
         traceback.print_exc()
         if temp_separation_subdir.exists(): shutil.rmtree(temp_separation_subdir)
